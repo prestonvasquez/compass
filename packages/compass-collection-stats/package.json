@@ -1,9 +1,16 @@
 {
   "name": "@mongodb-js/compass-collection-stats",
-  "productName": "Collection Stats",
+  "description": "Compass Collection Stats",
+  "author": {
+    "name": "MongoDB Inc",
+    "email": "compass@mongodb.com"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "homepage": "https://github.com/mongodb-js/compass",
   "version": "6.20.0",
   "apiVersion": "3.0.0",
-  "description": "Compass Collection Stats Plugin",
   "files": [
     "dist"
   ],
@@ -18,7 +25,6 @@
     "url": "https://github.com/mongodb-js/compass.git"
   },
   "scripts": {
-    "bootstrap": "npm run compile",
     "prepublishOnly": "npm run compile",
     "compile": "tsc -p tsconfig.json",
     "precompile": "rimraf dist",
