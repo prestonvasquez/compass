@@ -30,6 +30,7 @@
     "url": "https://github.com/mongodb-js/compass.git"
   },
   "scripts": {
+    "bootstrap": "npm run compile",
     "prepublishOnly": "npm run compile",
     "compile": "tsc -p tsconfig.json",
     "precompile": "rimraf dist",
@@ -45,6 +46,7 @@
     "test-watch": "npm run test -- --watch",
     "test-ci": "npm run test-cov",
     "test-ci-electron": "npm run test-electron",
+    "typecheck": "tsc --noEmit",
     "reformat": "npm run prettier -- --write ."
   },
   "license": "SSPL",
