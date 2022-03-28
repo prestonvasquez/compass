@@ -1,6 +1,5 @@
 /* eslint-disable valid-jsdoc */
 import fs from 'fs';
-import stream from 'stream';
 import { promisify } from 'util';
 
 import PROCESS_STATUS from '../constants/process-status';
@@ -13,9 +12,8 @@ import { createReadableCollectionStream } from '../utils/collection-stream';
 const createProgressStream = require('progress-stream');
 
 import createLoggerAndTelemetry from '@mongodb-js/compass-logging';
-import { createCSVFormatter, createJSONFormatter } from '../utils/formatters';
 import { loadFields, getSelectableFields } from './load-fields';
-
+import { CursorExporter } from './CursorExporter';
 const { log, mongoLogId, debug, track } = createLoggerAndTelemetry(
   'COMPASS-IMPORT-EXPORT-UI'
 );
@@ -489,62 +487,62 @@ export const startExport = () => {
             projection[parts.slice(0, index + 1).join('.')]
         )
     );
-    let formatter;
-    if (exportData.fileType === 'csv') {
-      formatter = createCSVFormatter({ columns });
-    } else {
-      formatter = createJSONFormatter();
-    }
-
     const dest = fs.createWriteStream(exportData.fileName);
     debug('executing pipeline');
-    dispatch(onStarted(source, dest, numDocsToExport));
-    stream.pipeline(source, progress, formatter, dest, function (err) {
-      track('Export Completed', {
-        all_docs: exportData.isFullCollection,
-        file_type: exportData.fileType,
-        all_fields: Object.values(exportData.fields).every(
-          (checked) => checked === 1
-        ),
-        number_of_docs: numDocsToExport,
-        success: !err,
-      });
-      if (err) {
-        log.error(mongoLogId(1001000085), 'Export', 'Export failed', {
-          ns,
-          error: err.message,
-        });
-        debug('error running export pipeline', err);
-        return dispatch(onError(err));
-      }
-      log.info(mongoLogId(1001000086), 'Export', 'Finished export', {
-        ns,
-        numDocsToExport,
-        fileName: exportData.fileName,
-      });
-      dispatch(onFinished(numDocsToExport));
-      /**
-       * TODO: lucas: For metrics:
-       *
-       * "resource": "Export",
-       * "action": "completed",
-       * "file_type": "<csv|json_array>",
-       * "num_docs": "<how many docs exported>",
-       * "full_collection": true|false
-       * "filter": true|false,
-       * "projection": true|false,
-       * "skip": true|false,
-       * "limit": true|false,
-       * "fields_selected": true|false
-       */
-      dispatch(
-        globalAppRegistryEmit(
-          'export-finished',
-          numDocsToExport,
-          exportData.fileType
-        )
-      );
+    const theRealSource = dataService.fetch(ns, spec.filter || {}, {
+      projection,
+      limit: spec.limit,
+      skip: spec.skip,
     });
+    const exporter = new CursorExporter({
+      cursor: theRealSource,
+      type: exportData.fileType,
+      columns: columns,
+      output: dest,
+      totalNumberOfDocuments: numDocsToExport,
+    });
+    exporter.on('progress', function (info) {
+      dispatch(onProgress(info.percentage, info.transferred));
+    });
+
+    dispatch(onStarted(source, dest, numDocsToExport));
+    await exporter.start();
+    track('Export Completed', {
+      all_docs: exportData.isFullCollection,
+      file_type: exportData.fileType,
+      all_fields: Object.values(exportData.fields).every(
+        (checked) => checked === 1
+      ),
+      number_of_docs: numDocsToExport,
+      success: true,
+    });
+    log.info(mongoLogId(1001000086), 'Export', 'Finished export', {
+      ns,
+      numDocsToExport,
+      fileName: exportData.fileName,
+    });
+    dispatch(onFinished(numDocsToExport));
+    /**
+     * TODO: lucas: For metrics:
+     *
+     * "resource": "Export",
+     * "action": "completed",
+     * "file_type": "<csv|json_array>",
+     * "num_docs": "<how many docs exported>",
+     * "full_collection": true|false
+     * "filter": true|false,
+     * "projection": true|false,
+     * "skip": true|false,
+     * "limit": true|false,
+     * "fields_selected": true|false
+     */
+    dispatch(
+      globalAppRegistryEmit(
+        'export-finished',
+        numDocsToExport,
+        exportData.fileType
+      )
+    );
   };
 };
 

@@ -10,12 +10,15 @@ export interface CursorExporterOpts {
   type: 'csv' | 'json';
   columns: Array<string> | boolean;
   output: stream.Writable;
+  totalNumberOfDocuments?: number;
 }
 export class CursorExporter extends EventEmitter {
   private _cursor: AbstractCursor;
   private _output: stream.Writable;
   private _formatter;
   private _columns: Array<string> | boolean;
+  private _totalNumberOfDocuments: number;
+  private _exportedDocuments = 0;
   constructor(opts: CursorExporterOpts) {
     super();
     this._cursor = opts.cursor;
@@ -23,6 +26,7 @@ export class CursorExporter extends EventEmitter {
       opts.type === 'csv' ? createCSVFormatter : createJSONFormatter;
     this._output = opts.output;
     this._columns = opts.columns ? opts.columns : true;
+    this._totalNumberOfDocuments = opts.totalNumberOfDocuments || 0;
   }
 
   async start(): Promise<void> {
@@ -36,6 +40,12 @@ export class CursorExporter extends EventEmitter {
   private getFormatter() {
     return this._formatter({ columns: this._columns });
   }
+  private _getPercentageOfDocuments() {
+    if (this._totalNumberOfDocuments) {
+      return (this._exportedDocuments * 100) / this._totalNumberOfDocuments;
+    }
+    return 0;
+  }
   private getProgressTransformStream() {
     const emit = this.emit.bind(this);
     return new stream.Transform({
@@ -43,7 +53,11 @@ export class CursorExporter extends EventEmitter {
       writableObjectMode: true,
       transform: (doc, encoding, callback) => {
         try {
-          emit('progress');
+          this._exportedDocuments++;
+          emit('progress', {
+            percentage: this._getPercentageOfDocuments(),
+            transferred: this._exportedDocuments,
+          });
         } catch (err) {
           // do nothing
         } finally {

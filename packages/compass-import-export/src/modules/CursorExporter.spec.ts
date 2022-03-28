@@ -145,6 +145,34 @@ describe('CursorExporter', function () {
         await exporter.start();
         expect(onProgress.callCount).to.equal(5);
       });
+      it('should send progress stats', async function () {
+        const data = [
+          { first_name: 'Alice' },
+          { first_name: 'Bob' },
+          { first_name: 'Charlie' },
+          { first_name: 'Diana' },
+        ];
+        await collection.insertMany(data);
+        const onProgress = spy();
+        const exporter = new CursorExporter({
+          cursor: collection.find(),
+          type: 'csv',
+          output: outputStream,
+          columns: true,
+          numberOfDocuments: 5,
+        });
+        exporter.on('progress', onProgress);
+        await exporter.start();
+        for (let i = 0; i < 4; i++) {
+          const progressCall = onProgress.getCall(i);
+          expect(
+            progressCall.calledWith({
+              percentage: 20 * (i + 1),
+              transferred: i + 1,
+            })
+          ).to.be.true;
+        }
+      });
     });
     it('should pause export', function () {});
   });
