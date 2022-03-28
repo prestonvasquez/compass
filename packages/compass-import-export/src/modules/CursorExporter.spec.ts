@@ -159,7 +159,7 @@ describe('CursorExporter', function () {
           type: 'csv',
           output: outputStream,
           columns: true,
-          numberOfDocuments: 5,
+          totalNumberOfDocuments: 5,
         });
         exporter.on('progress', onProgress);
         await exporter.start();
